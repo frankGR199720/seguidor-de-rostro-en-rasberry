@@ -1,0 +1,107 @@
+#-------IMPORTACION DE LAS BIBLIOTECAS----------
+
+import cv2
+from picamera2 import Picamera2
+
+#-----------VARIABLES--------
+
+marca = 0
+
+#---------ALGORITMO USADO PARA LA EXTRACCION DE ROSTROS-----------
+
+face_detector = cv2.CascadeClassifier("/home/frank/Documents/programa_motores/opencv-master/data/haarcascades/haarcascade_frontalface_default.xml")
+cv2.startWindowThread()
+
+#------------FUNCION DE MAUSE------------------------------
+
+def mouse(evento, xm, ym,bandera,param):
+    global xmo,ymo,marca 
+    if evento == cv2.EVENT_LBUTTONDOWN:
+        #print('evento = ', evento)
+        #print('x = ', xm)
+        #print('y = ', ym)
+        #print('bandera = ', bandera)
+        xmo = xm
+        ymo = ym
+        marca = 1
+       
+
+#-----------INICIALIZACION DE CAMARA----------------------------
+
+picam2 = Picamera2()
+picam2.configure(picam2.create_preview_configuration(main={"format": 'XRGB8888', "size": (640, 480)}))
+picam2.start()
+
+#---------------CICLO PARA LA EXTRACCION DE LOS FOTOGRAMAS------------
+
+while True:
+    im = picam2.capture_array()
+
+    rgb = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
+    faces = face_detector.detectMultiScale(rgb, 1.1, 5) 
+
+    #extraccion de puntos medios de pantalla
+    alp, anp, c = im.shape
+    
+    centro_alto = int(alp/2)
+    centro_ancho = int(anp/2)
+    print(alp, anp, centro_alto, centro_ancho)
+
+    #extraccion para puntos iniciales (x, y) y ancho/alto del rostro 
+    for (x, y, ancho, alto) in faces:
+        
+        #dibujo para localizacion de rostros
+        cv2.rectangle(im, (x, y), (x + ancho, y + alto), (0, 255, 0))
+
+        #extraccion de (x, y) del  centro del rostro
+        cx = int(x + (ancho/2))
+        cy = int(y + (alto/2))
+        print('x1 = ', x, ', centro x = ', cx, 'x2 = ', x+ancho, ', y1 = ',y , ', centro y = ', cy, 'y2 = ', y+alto)
+
+        #extraccion de las cordenadas de x2,y2
+        x2 = x + ancho
+        y2 = y + alto
+
+        #dibujo para localizacion del centro del rostro
+        cv2.circle(im, (cy, cx),5 ,(0,0,255) , cv2.FILLED)
+
+        #funciones para el llamado del click del mause
+        cv2.namedWindow("Camara")
+        cv2.setMouseCallback("Camara", mouse)
+
+        if marca == 1:
+            if x < xmo < x2 and y < ymo < y2:
+                cv2.circle(im, (xmo, ymo), 20, (0,255,0),2)
+                cv2.rectangle(im,(x,y),(x2,y2,),(255,255.0),2)
+
+                #-------------CONDICIONES PARA MOVER SERVO-------------
+
+                #condiciones del eje x
+                if xmo < centro_ancho - 50:
+                    #movemos hacia la izquierda
+                    print('izquierda')
+
+                if xmo > centro_ancho + 50:
+                    #movemos hacia la derecha
+                    print('derecha')
+                
+                #condiciones del eje y
+                if ymo < centro_alto - 50:
+                    # Movemos hacia arriva
+                    print("arriba")
+
+                if ymo > centro_alto + 50:
+                    # movemos hacia abajo
+                    print("abajo")
+
+                #condiciones de centro
+                if xmo>=270 and xmo<=370:
+                    # Paramos el servo
+                    print("centro x")
+
+    cv2.imshow("Camara", im)
+    t = cv2.waitKey(1)
+    if t == 27:
+        cv2.destroyAllWindows()
+        break
+    
