@@ -2,14 +2,25 @@
 
 import cv2
 from picamera2 import Picamera2
+from gpiozero import AngularServo
+
+from gpiozero.pins.pigpio import PiGPIOFactory
 
 #-----------VARIABLES--------
 
 marca = 0
 
+#----------iniciacion de los servos
+
+factory = PiGPIOFactory()
+
+servo_eje_x =AngularServo(12, min_angle=-90,max_angle=90,min_pulse_width=0.5/1000,max_pulse_width=2.3/1000,pin_factory=factory)
+servo_eje_y =AngularServo(13, min_angle=-90,max_angle=90,min_pulse_width=0.5/1000,max_pulse_width=2.3/1000,pin_factory=factory)
+
+
 #---------ALGORITMO USADO PARA LA EXTRACCION DE ROSTROS-----------
 
-face_detector = cv2.CascadeClassifier("/home/frank/Documents/programa_motores/opencv-master/data/haarcascades/haarcascade_frontalface_default.xml")
+face_detector = cv2.CascadeClassifier("/home/frank/Documents/proyecto_motor/opencv-4.x/data/haarcascades/haarcascade_frontalface_default.xml")
 cv2.startWindowThread()
 
 #------------FUNCION DE MAUSE------------------------------
@@ -25,7 +36,6 @@ def mouse(evento, xm, ym,bandera,param):
         ymo = ym
         marca = 1
        
-
 #-----------INICIALIZACION DE CAMARA----------------------------
 
 picam2 = Picamera2()
@@ -34,14 +44,22 @@ picam2.start()
 
 #---------------CICLO PARA LA EXTRACCION DE LOS FOTOGRAMAS------------
 
+servo_eje_x.angle = 0
+servo_eje_y.angle = 0
+
 while True:
+   
     im = picam2.capture_array()
+
+    im=cv2.flip(im, 1)
 
     rgb = cv2.cvtColor(im, cv2.COLOR_BGR2GRAY)
     faces = face_detector.detectMultiScale(rgb, 1.1, 5) 
 
     #extraccion de puntos medios de pantalla
     alp, anp, c = im.shape
+
+    
     
     centro_alto = int(alp/2)
     centro_ancho = int(anp/2)
@@ -62,42 +80,51 @@ while True:
         x2 = x + ancho
         y2 = y + alto
 
-        #dibujo para localizacion del centro del rostro
-        cv2.circle(im, (cy, cx),5 ,(0,0,255) , cv2.FILLED)
-
         #funciones para el llamado del click del mause
         cv2.namedWindow("Camara")
         cv2.setMouseCallback("Camara", mouse)
 
         if marca == 1:
             if x < xmo < x2 and y < ymo < y2:
+                xmo = cx
+                ymo = cy
                 cv2.circle(im, (xmo, ymo), 20, (0,255,0),2)
                 cv2.rectangle(im,(x,y),(x2,y2,),(255,255.0),2)
-
+                
                 #-------------CONDICIONES PARA MOVER SERVO-------------
 
                 #condiciones del eje x
                 if xmo < centro_ancho - 50:
                     #movemos hacia la izquierda
                     print('izquierda')
+                    servo_eje_x.angle = -90
 
                 if xmo > centro_ancho + 50:
                     #movemos hacia la derecha
                     print('derecha')
+                    servo_eje_x.angle = 90
                 
                 #condiciones del eje y
                 if ymo < centro_alto - 50:
-                    # Movemos hacia arriva
-                    print("arriba")
+                #    # Movemos hacia arriva
+                    print("arriva")
+                    servo_eje_y.angle = 90
 
                 if ymo > centro_alto + 50:
-                    # movemos hacia abajo
+                #    # movemos hacia abajo
                     print("abajo")
+                    servo_eje_y.angle = -90
 
                 #condiciones de centro
                 if xmo>=270 and xmo<=370:
                     # Paramos el servo
                     print("centro x")
+                    servo_eje_x.angle = 0
+                    
+                if ymo>=190 and ymo<=290:
+                    # Paramos el servo
+                    print("centro y")
+                    servo_eje_y.angle = 0
 
     cv2.imshow("Camara", im)
     t = cv2.waitKey(1)
